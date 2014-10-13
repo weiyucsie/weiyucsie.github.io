@@ -1,0 +1,35 @@
+﻿<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>Frame Page</title>
+</head>
+<body>
+    <div>
+        選擇網址：
+        <select id="selectUrl">
+            <option>http://www.w3schools.com/tags/tryit.asp?filename=tryhtml_a_target</option>
+            <option>http://www.w3schools.com/jsref/tryit.asp?filename=tryjsref_win_open</option>
+            <option>http://jsfiddle.net/jvpexhnj/</option>
+        </select>
+    </div>
+    <div>URL: <input type="text" id="url" size="100" value="http://www.w3schools.com/tags/tryit.asp?filename=tryhtml_a_target" /></div>
+    <div>Target: <input type="text" id="targetName" value="_blank" /></div>
+    <div><button id="btn">window.open</button></div>
+    <script type="text/javascript">
+        (function () {
+            var selectUrlEl = document.getElementById('selectUrl');
+            selectUrl.addEventListener('change', function (e) {
+                var urlEl = document.getElementById('url');
+                urlEl.value = this.value;
+            }, false);
+            var btnEl = document.getElementById('btn');
+            btnEl.addEventListener('click', function (e) {
+                var urlEl = document.getElementById('url');
+                var targetNameEl = document.getElementById('targetName');
+                var win = window.open(urlEl.value, targetNameEl.value);
+            }, false);
+        })()
+    </script>
+</body>
+</html>

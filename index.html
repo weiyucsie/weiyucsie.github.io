@@ -1,0 +1,18 @@
+﻿<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>With IFrame</title>
+</head>
+<body>
+    <div id="loc"></div>
+    <iframe src="frameTest.html" width="800" height="500"></iframe>
+    <iframe src="http://www.w3schools.com/jsref/tryit.asp?filename=tryjsref_win_open" width="800" height="500"></iframe>
+    <script type="text/javascript">
+        (function () {
+            var loc = document.getElementById('loc');
+            loc.textContent = window.location.href;
+        })()
+    </script>
+</body>
+</html>
