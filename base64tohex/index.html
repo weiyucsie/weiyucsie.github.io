@@ -1,0 +1,35 @@
+<!doctype html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>Base64 to HEX</title>
+<script type="text/javascript">
+function str2hex(str) {
+  var i;
+  var output = "";
+  for (i = 0; i < str.length; i++) {
+  	output += str.charCodeAt(i).toString(16).toUpperCase();
+  }
+  return output;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  var inputEl = document.querySelector('input');
+  inputEl.addEventListener('change', function() {
+    var outputText;
+    try {
+      outputText = str2hex(atob(inputEl.value));
+    } catch (e) {
+      outputText = e;
+    }
+    document.querySelector('.result').textContent = outputText; 
+  }, false);
+}, false);
+</script>
+</head>
+<body>
+<div>
+Base64:	<input type="text" />
+</div>
+HEX: <div class="result"></div>
+</body>
+</html>
