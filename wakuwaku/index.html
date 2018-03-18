@@ -1,0 +1,249 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>分析時間</title>
+<script type="text/javascript" src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+<script type="text/javascript" src="https://apis.google.com/js/api.js"></script>
+<script type="text/javascript" src="gcal.js"></script>
+<script type="text/javascript">
+  var wjHostUrl = 'http://twn.wakuwakujapan.tv';
+
+  function parseTimeString(datePart, timeStr) {
+    var timeRegInfo = timeStr.match(/(\d+).(\d+)([ap]m)/);
+    if (timeRegInfo) {
+      var hour = parseInt(timeRegInfo[1], 10);
+      var minute = parseInt(timeRegInfo[2], 10);
+      var am_pm = timeRegInfo[3];
+      var hoffset = am_pm == 'pm' ? 12 : 0;
+
+      return new Date(datePart.year, datePart.month - 1, datePart.mday, hour + hoffset, minute);
+    }
+  }
+
+  function parseDatePeriod(dateMsg) {
+    var dateRegInfo = dateMsg.match(/(\d+)月(\d+)日\(週.\) (\d+.\d+[ap]m) - (\d+.\d+[ap]m)/);
+    var year = (new Date()).getFullYear();
+    var month = parseInt(dateRegInfo[1], 10);
+    var mday = parseInt(dateRegInfo[2], 10);
+  var datePart = {year:year, month: month, mday: mday};
+    var startTime = parseTimeString(datePart, dateRegInfo[3]);
+    var endTime = parseTimeString(datePart, dateRegInfo[4]);
+
+    return {
+      'start': {
+        'dateTime': startTime.toISOString()
+      },
+      'end': {
+	'dateTime': endTime.toISOString()
+      }
+    };
+  }
+
+  function getHtml(url, success, useProxy) {
+    if (url.search('://') !== -1) {
+      useProxy = true;
+    }
+    var realUrl;
+    if (useProxy) {
+      realUrl = 'https://crossorigin.me/' + url;
+      // realUrl = 'proxy.php?url=' + url;
+    } else {
+      realUrl = url;
+    }
+    return jQuery.get({
+      url: realUrl,
+      success: success,
+      dataType: 'html'
+    });
+  }
+
+  function createShowButton(onShow, onlyOnInit) {
+    var listSpan = $("<span>[列出]</span>");
+    return listSpan.click(function() {
+      var newList = $("<ul></ul>");
+      onShow(newList);
+      if (listSpan.data("list")) {
+	listSpan.data("list").replaceWith(newList);
+      } else {
+	listSpan.after(newList);
+	if (onlyOnInit) {
+	  onlyOnInit(newList);
+	}
+      }
+      listSpan.data("list", newList);
+    });
+  }
+
+  function parseProgramSchedule(url, items, useProxy) {
+    getHtml(url, function(data, textStatus, jqXHR) {
+      try {
+	var doc = $(data);
+	var ogTitle = doc.filter("meta[property='og:title']").attr("content");
+	var description = doc.filter("meta[name='description']").attr("content");
+	var urlTitle = doc.filter("title").text();
+	$(".box-schedule li", data).each(function() {
+	  var idoc = $(this);
+	  var textPeriod = idoc.find(".date").text();
+	  var evt = parseDatePeriod(textPeriod);
+	  var title = idoc.find(".title").text();
+	  evt.summary = ogTitle + ' ' + title;
+	  evt.description = description;
+	  evt.source = {
+	    title: urlTitle,
+	    url: url
+	  };
+	  var item = $("<li></li>");
+	  item.data("event", evt);
+	  item.append("<input type='checkbox'>");
+	  item.append(evt.summary + " " + textPeriod);
+	  items.append(item);
+	});
+      } catch (e) {
+	console.log(e);
+      }
+    }, useProxy);
+  }
+
+  function copyLinkElement(srcLink, baseUrl) {
+    var origLink = $(srcLink);
+    var newLink = $("<a />").text(origLink.text());
+    newLink.attr("href", baseUrl + origLink.attr("href"));
+
+    return newLink;
+  }
+
+  function getCalendarId() {
+    return $("#my-calendar-container select").val();
+  }
+
+  function parseSingleProgramList(url, programsInCategory, baseUrl) {
+    var selector = '#programBlock>.ProgramBox>a';
+    getHtml(url, function(data) {
+      $(selector, data).each(function() {
+	var programLi = $("<li></li>");
+	var programLink = $("<a></a>", {
+	  attr: {"href": baseUrl + $(this).attr("href")},
+	  text: $(".detail h3", this).text()
+	});
+	programLi.append(programLink);
+	programLi.append(createShowButton(function(newList) {
+	  parseProgramSchedule(programLink.attr("href"), newList, true);
+	}, function(newList) {
+	  var funcBlock = $("<div></div>");
+	  var selectAllBtn = $("<button>全選</button>");
+	  var uploadBtn = $("<button>上傳</button>");
+	  selectAllBtn.click(function() {
+	    newList.find("input[type=checkbox]").prop("checked", true);
+	  });
+	  uploadBtn.click(function() {
+	    var reqBatch = gapi.client.newBatch();
+
+	    newList.find("input[type=checkbox]").each(function() {
+	      var req = gapi.client.calendar.events.insert({
+	        'calendarId': getCalendarId(),
+	        'resource': $(this).parent().data("event")
+	      });
+	      reqBatch.add(req);
+	    });
+
+	    reqBatch.then(function(resp) {
+	      console.log(resp);
+	    });
+	  });
+	  funcBlock.append(selectAllBtn).append(uploadBtn);
+	  newList.after(funcBlock);
+	}));
+	programsInCategory.append(programLi);
+      });
+    }, true);
+  }
+
+  function parseProgramList() {
+    var programListUrl = 'http://twn.wakuwakujapan.tv/zh/program/';
+
+    getHtml(programListUrl, function(data, textStatus, jqXHR) {
+      var pcat = $("#ProgramCategory");
+      if (pcat.children().length > 0) {
+	return;
+      }
+      $("#program-category li a", data).each(function() {
+        var catDiv = $("<div></div>", {"class": "category"});
+	var catLink = copyLinkElement(this, wjHostUrl);
+	catDiv.append(catLink);
+	catDiv.append(
+	  createShowButton(function(newList) {
+	    parseSingleProgramList(catLink.attr("href"), newList, wjHostUrl);
+	  })
+	);
+	pcat.append(catDiv);
+      });
+    }, true);
+  }
+
+  function updateSigninStatus(isSignedIn) {
+    var signedClass = 'gcal-signedin';
+    if (isSignedIn) {
+      $('body').addClass(signedClass);
+
+      var calListEl = createMyGoogleCalendarListElement();
+      $(calListEl).change(function(evt) {
+	var target = evt.target;
+	if (target.selectedIndex === -1) {
+	  return;
+	}
+	var summaryEl = $("#calendar_summary");
+	var optEl = $(target.options[target.selectedIndex]);
+	summaryEl.val(optEl.text());
+	summaryEl.data("calendar", optEl);
+      });
+      $('#my-calendar-container').append(calListEl);
+    }
+  }
+
+  // .ready()
+  $(function() {
+    $("#wjdate").blur(function() {
+      var dateMsg = $(this).val();
+      if (dateMsg.trim().length > 0) {
+	var period = parseDatePeriod(dateMsg);
+	alert(period);
+      }
+    });
+    $("#list_category_btn").click(parseProgramList);
+    $("#gcal-login").click(function() {
+      gapi.auth2.getAuthInstance().signIn();
+    });
+    gapi.load('client:auth2', function() {
+      initGoogleCalendarClient('756873854878-papc3a6fdqdici3rmlh49bnaj98v3e94.apps.googleusercontent.com', updateSigninStatus);
+    });
+  });
+</script>
+<style type="text/css">
+  .gcal-status {display: none;}
+  body:not(.gcal-signedin) #gcal-login {display: block;}
+</style>
+</head>
+<body>
+<div style="display:none"><!-- 純測試用 -->
+  請輸入 Wakuwaku Japan 節目時間： <input id="wjdate">
+</div>
+<div>
+  <h2>Wakuwaku Japan 節目列表</h2>
+  <div id="ProgramCategory">
+  </div>
+</div>
+<div>
+  <button id="list_category_btn">列出節目列表</button>
+  <button id="gcal-login" class="gcal-status">登入 Google Calendar</button>
+</div>
+<div>
+  <div>
+    <a href="https://calendar.google.com/calendar/r" target="_blank">Google 日曆</a>
+  </div>
+  <div id="my-calendar-container">
+    我的日曆：
+  </div>
+</div>
+</body>
+</html>
