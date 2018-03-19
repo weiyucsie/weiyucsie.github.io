@@ -81,6 +81,8 @@
 	var ogTitle = doc.filter("meta[property='og:title']").attr("content");
 	var description = doc.filter("meta[name='description']").attr("content");
 	var urlTitle = doc.filter("title").text();
+	var titleSet = new Set();
+	var lastEndTime = '';
 	$(".box-schedule li", data).each(function() {
 	  var idoc = $(this);
 	  var textPeriod = idoc.find(".date").text();
@@ -92,7 +94,20 @@
 	    title: urlTitle,
 	    url: url
 	  };
+
+	  var isFirst = !titleSet.has(title);
+	  if (isFirst) {
+	    titleSet.add(title);
+	  }
+
+	  // 假設資料來源有依照時間順序
+	  // 這邊要判斷是否是連續的節目
+	  var isContinuousPlay = evt.start.dateTime === lastEndTime;
+	  lastEndTime = evt.end.dateTime;
+
 	  var item = $("<li></li>");
+	  item.data('first', isFirst);
+	  item.data('continuous', isContinuousPlay);
 	  item.data("event", evt);
 	  item.append("<input type='checkbox'>");
 	  item.append(evt.summary + " " + textPeriod);
@@ -131,9 +146,15 @@
 	}, function(newList) {
 	  var funcBlock = $("<div></div>");
 	  var selectAllBtn = $("<button>全選</button>");
+	  var selectFirstPlayBtn = $("<button>選取首播</button>");
 	  var uploadBtn = $("<button>上傳</button>");
 	  selectAllBtn.click(function() {
 	    newList.find("input[type=checkbox]").prop("checked", true);
+	  });
+	  selectFirstPlayBtn.click(function() {
+	    newList.children("li").filter(function() {
+	      return $(this).data("first");
+	    }).children("input[type=checkbox]").prop("checked", true);
 	  });
 	  uploadBtn.click(function() {
 	    var reqBatch = gapi.client.newBatch();
@@ -150,7 +171,7 @@
 	      console.log(resp);
 	    });
 	  });
-	  funcBlock.append(selectAllBtn).append(uploadBtn);
+	  funcBlock.append(selectAllBtn).append(selectFirstPlayBtn).append(uploadBtn);
 	  newList.after(funcBlock);
 	}));
 	programsInCategory.append(programLi);
