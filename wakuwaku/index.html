@@ -12,7 +12,7 @@
   function parseTimeString(datePart, timeStr) {
     var timeRegInfo = timeStr.match(/(\d+).(\d+)([ap]m)/);
     if (timeRegInfo) {
-      var hour = parseInt(timeRegInfo[1], 10);
+      var hour = parseInt(timeRegInfo[1], 10) % 12;
       var minute = parseInt(timeRegInfo[2], 10);
       var am_pm = timeRegInfo[3];
       var hoffset = am_pm == 'pm' ? 12 : 0;
@@ -29,6 +29,10 @@
   var datePart = {year:year, month: month, mday: mday};
     var startTime = parseTimeString(datePart, dateRegInfo[3]);
     var endTime = parseTimeString(datePart, dateRegInfo[4]);
+    if (endTime < startTime) {
+      // 可能是過午夜的情況
+      endTime.setDate(endTime.getDate() + 1);
+    }
 
     return {
       'start': {
@@ -150,16 +154,10 @@
 	}, function(newList) {
 	  var funcBlock = $("<div></div>");
 	  var selectAllBtn = $("<button>全選</button>");
-	  var selectFirstStartBtn = $("<button>選取非接續首播</button>");
 	  var selectFirstPlayBtn = $("<button>選取首播</button>");
 	  var uploadBtn = $("<button>上傳</button>");
 	  selectAllBtn.click(function() {
 	    newList.find("input[type=checkbox]").prop("checked", true);
-	  });
-	  selectFirstStartBtn.click(function() {
-	    newList.children("li").filter(function() {
-	      return $(this).data("first-start");
-	    }).children("input[type=checkbox]").prop("checked", true);
 	  });
 	  selectFirstPlayBtn.click(function() {
 	    newList.children("li").filter(function() {
@@ -169,10 +167,45 @@
 	  uploadBtn.click(function() {
 	    var reqBatch = gapi.client.newBatch();
 
-	    newList.find("input[type=checkbox]").each(function() {
+	    var reminder_type = $("#reminder_info [name=reminder_type]:checked").val();
+	    var reminder_minutes = parseInt($("#reminder_minutes").val(), 10);
+	    var event_reminder;
+	    if (!isNaN(reminder_minutes) && reminder_minutes >= 0 && reminder_minutes <= 40320) {
+	      event_reminder = {
+	        reminders: {
+		  useDefault: false,
+	          overrides: [
+	            {
+		      method: 'popup',
+	              minutes: reminder_minutes
+	            }
+	          ]
+	        }
+	      };
+	    } else {
+	      event_reminder = {};
+	    }
+	    newList.find("input[type=checkbox]:checked").each(function() {
+	      var item = $(this).parent();
+	      var evt = item.data("event");
+	      var reminder = {};
+	      switch (reminder_type) {
+		case'first-start':
+		  if (item.data("first-start")) {
+		    reminder = event_reminder;
+		  }
+		  break;
+		case 'all':
+		  reminder = event_reminder;
+		  break;
+		case 'none':
+		default:
+		  break;
+	      }
+	      var eventCopy = Object.assign(reminder, evt);
 	      var req = gapi.client.calendar.events.insert({
 	        'calendarId': getCalendarId(),
-	        'resource': $(this).parent().data("event")
+	        'resource': eventCopy
 	      });
 	      reqBatch.add(req);
 	    });
@@ -183,7 +216,6 @@
 	  });
 	  funcBlock.
 	    append(selectAllBtn).
-	    append(selectFirstStartBtn).
 	    append(selectFirstPlayBtn).
 	    append(uploadBtn);
 	  newList.after(funcBlock);
@@ -266,6 +298,12 @@
   <h2>Wakuwaku Japan 節目列表</h2>
   <div id="ProgramCategory">
   </div>
+</div>
+<div id="reminder_info">
+  提示方式： <input type="radio" name="reminder_type" value="none" checked="checked"> 無
+  <input type="radio" name="reminder_type" value="first-start"> 非接續首播
+  <input type="radio" name="reminder_type" value="all"> 全部
+  <input id="reminder_minutes"> 分鐘
 </div>
 <div>
   <button id="list_category_btn">列出節目列表</button>
