@@ -210,8 +210,21 @@
 	      reqBatch.add(req);
 	    });
 
+	    var msgConsole = $("#message_console");
 	    reqBatch.then(function(resp) {
-	      console.log(resp);
+	      msgConsole.prop('className', 'ok-message');
+	      msgConsole.empty();
+	      msgConsole.append("<div>已上傳列表：</div>");
+	      $.map(resp.result, function(val, key) {
+	        var result = val.result;
+	        var divEl = $("<div></div>");
+		divEl.append($("<a></a>").text(result.summary).attr('href', result.htmlLink));
+		msgConsole.append(divEl);
+	      });
+	    }, function(reason) {
+	      console.error(reason);
+	      msgConsole.prop('className', 'error-message');
+	      msgConsole.html("上傳發生錯誤");
 	    });
 	  });
 	  funcBlock.
@@ -288,6 +301,9 @@
 <style type="text/css">
   .gcal-status {display: none;}
   body:not(.gcal-signedin) #gcal-login {display: block;}
+  .no-message {display: none;}
+  .error-message {display: block; color: red;}
+  .ok-message {display: block; border: dashed 1px black;}
 </style>
 </head>
 <body>
@@ -304,6 +320,8 @@
   <input type="radio" name="reminder_type" value="first-start"> 非接續首播
   <input type="radio" name="reminder_type" value="all"> 全部
   <input id="reminder_minutes"> 分鐘
+</div>
+<div id="message_console" class="no-message">
 </div>
 <div>
   <button id="list_category_btn">列出節目列表</button>
